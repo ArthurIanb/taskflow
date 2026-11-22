@@ -1,31 +1,33 @@
-from fastapi import APIRouter, Body, Depends
-from typing import Annotated
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
-from .schemas import CreateUserRequest, CreateUserResponse
+from .schemas import CreateUserRequest
 from .models import User
-from app.database import get_db, SesionLocal
-from app.security import hash_password
 
-SessionDep = Annotated[Session, Depends(get_db)]
+from app.security import hash_password, verify_password
 
-router = APIRouter(
-    prefix="/users",
-    tags=["Users"]
-)
 
-@router.post("/")
-def create_user(ucr: CreateUserRequest, db: SessionDep) -> CreateUserResponse:
-    hashed_pwd = hash_password(ucr.password)
+def get_user_by_username(db: Session, username: str) -> User | None:
+    stmt = select(User).where(User.username == username)
+    return db.scalar(stmt)
+
+
+def create_user(db: Session, user_data: CreateUserRequest) -> User:
     user = User(
-        username = ucr.username,
-        email = ucr.email,
-        hashed_password = hashed_pwd
+        username=user_data.username,
+        email = user_data.email,
+        hashed_password=hash_password(user_data.password)
     )
 
     db.add(user)
     db.commit()
     db.refresh(user)
+    return user
 
-    return CreateUserResponse(username=user.username, email=user.email)
 
+def authenticate_user(db: Session, username: str, password: str) -> User | None:
+    user = get_user_by_username(db=db, username=username)
+
+    if not user or not verify_password(password, user.hashed_password):
+        return None
+    return user
