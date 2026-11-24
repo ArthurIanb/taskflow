@@ -12,6 +12,7 @@ class TaskStatus(str, Enum):
     draft = "Draft"
     opened =  "Opened"
     closed = "Closed"
+    in_review = "In review"
 
 
 class Contestant(BaseModel):

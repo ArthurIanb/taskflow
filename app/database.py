@@ -1,6 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
 from app.config import settings
+from typing import Annotated
+from fastapi import Depends
 
 
 engine = create_engine(
@@ -16,3 +18,5 @@ def get_db():
 
 class Base(DeclarativeBase):
     ... 
+
+SessionDep = Annotated[Session, Depends(get_db)]

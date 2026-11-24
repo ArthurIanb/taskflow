@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from .schemas import CreateUserRequest
 from .models import User
@@ -20,7 +21,11 @@ def create_user(db: Session, user_data: CreateUserRequest) -> User:
     )
 
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ValueError("User already exists")
     db.refresh(user)
     return user
 

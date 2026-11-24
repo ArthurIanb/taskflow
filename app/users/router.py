@@ -65,6 +65,8 @@ def read_authorised_user(user: Annotated[User,Depends(get_current_user)]):
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def create_user(user_data: CreateUserRequest, db: SessionDep) -> CreateUserResponse:
-    user = service.create_user(user_data=user_data, db=db)
-
+    try:
+        user = service.create_user(user_data=user_data, db=db)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     return CreateUserResponse(username=user.username, email=user.email)

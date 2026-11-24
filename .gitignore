@@ -221,3 +221,4 @@ __marimo__/
 
 app.db
 .DS_Store
+*_met.*
