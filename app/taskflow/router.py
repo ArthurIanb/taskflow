@@ -36,7 +36,7 @@ def create_blackboard(blackboard_data: CreateBlackBoardRequest,
     return bb
 
 
-@router.get("/blackboards/{blackboard_id:int}")
+@router.get("/blackboardss/{blackboard_id:int}")
 def get_blackboard(blackboard_id: int, db: SessionDep, user: User=Depends(UserRoutes.get_current_user)) -> BaseBlackboard:
     try:
         blackboard = get_blackboard_with_access(db=db, user=user, blackboard_id=blackboard_id)
@@ -76,7 +76,7 @@ def create_task(db: SessionDep, task_data: CreateTaskRequest, user: User = Depen
     return task
 
 
-@router.post("/blackboard/{blackboard_id:int}/assign", response_model=BaseBlackboard)
+@router.post("/blackboards/{blackboard_id:int}/assign", response_model=BaseBlackboard)
 def assign_user_to_blackboard(db: SessionDep, blackboard_id: int, new_user_username: str, user:User= Depends(UserRoutes.get_current_user)) -> BaseBlackboard:
     try:
         blackboard = get_blackboard_with_access(db=db, user=user, blackboard_id=blackboard_id,required_role=Role.owner)
@@ -126,7 +126,7 @@ def assign_contestant_to_task(db: SessionDep,task_id: int, new_user_username: st
 
 
 @router.delete("/tasks/{task_id:int}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(db: SessionDep, task_id: int, owner: User = UserRoutes.get_current_user):
+def delete_task(db: SessionDep, task_id: int, owner: User = Depends(UserRoutes.get_current_user)):
     try:
         task = get_task_with_access(db, owner, task_id, Role.owner)
     except LookupError as e:
@@ -185,18 +185,18 @@ def change_task_status(new_status: TaskStatus, required_role: Role | None=None) 
         return updated_task
     return _dependency
 
-@router.patch("/task/{task_id}/open", response_model=BaseTask)
+@router.patch("/tasks/{task_id}/open", response_model=BaseTask)
 def open_task(task: Task = Depends(change_task_status(TaskStatus.opened, Role.owner))) -> BaseTask:
     return task
 
-@router.patch("/task/{task_id}/review", response_model=BaseTask)
+@router.patch("/tasks/{task_id}/review", response_model=BaseTask)
 def put_in_review(task: Task = Depends(change_task_status(TaskStatus.in_review))) -> BaseTask:
     return task
 
-@router.patch("/task/{task_id}/close", response_model=BaseTask)
+@router.patch("/tasks/{task_id}/close", response_model=BaseTask)
 def close_task(task: Task = Depends(change_task_status(TaskStatus.closed, Role.owner))):
     return task
 
-@router.patch("/task/{task_id}/reject", response_model=BaseTask)
+@router.patch("/tasks/{task_id}/reject", response_model=BaseTask)
 def reject_task(task: Task = Depends(change_task_status(TaskStatus.opened, Role.owner))):
     return task

@@ -14,8 +14,8 @@ class Blackboard(Base):
     title: Mapped[str] = mapped_column(String(50))
     description: Mapped[str] = mapped_column(String(100))
 
-    tasks: Mapped[list["Task"]] = relationship(back_populates="blackboard")
-    contestants: Mapped[list["BlackboardContestants"]] = relationship(back_populates="blackboard")
+    tasks: Mapped[list["Task"]] = relationship(back_populates="blackboard",cascade="all, delete-orphan")
+    contestants: Mapped[list["BlackboardContestants"]] = relationship(back_populates="blackboard",cascade="all, delete-orphan")
 
 class BlackboardContestants(Base):
     __tablename__ = "blackboard_contestants"
@@ -40,7 +40,8 @@ class Task(Base):
     blackboard_id: Mapped[int] = mapped_column(ForeignKey("blackboards.id"))
     status: Mapped[TaskStatus] = mapped_column(default=TaskStatus.draft)
 
-    executors: Mapped[list["TaskExecutors"]] = relationship(back_populates="task")
+    executors: Mapped[list["TaskExecutors"]] = relationship(back_populates="task",
+                                                            cascade="all, delete-orphan")
     blackboard: Mapped["Blackboard"] = relationship(back_populates="tasks")
 
 class TaskExecutors(Base):

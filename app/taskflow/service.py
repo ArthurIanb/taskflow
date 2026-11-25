@@ -54,7 +54,7 @@ def create_task(db: Session, title: str, description: str, task_status: TaskStat
         contestants_ids = [e.contestant_id for e in blackboard.contestants]
         for user in executors:
             if user.id not in contestants_ids:
-                raise ValueError(f"Contester with id={user.id} is not assigned to this blackboard")
+                raise ValueError(f"Contester {user.username} is not assigned to this blackboard")
             te = TaskExecutors(user=user)
             task.executors.append(te)
     blackboard.tasks.append(task)
@@ -108,7 +108,7 @@ def assign_to_task(db: Session, task: Task, new_user_username: str) -> Task:
     return task
 
 
-def delete_task(db: Session, task: Task) -> Blackboard:
+def delete_task(db: Session, task: Task):
     db.delete(task)
     db.commit()
 
