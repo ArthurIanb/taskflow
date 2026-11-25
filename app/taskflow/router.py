@@ -1,12 +1,13 @@
-from typing import Annotated
+from typing import Annotated, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from .models import Blackboard
+from .models import Task
 from .schemas import CreateBlackBoardRequest, Role, CreateTaskRequest, BaseBlackboard, BaseTask
+from .schemas import UpdateTask, TaskStatus
 from . import service as TFService
 from .permissions import get_blackboard_with_access, get_task_with_access
 
@@ -34,6 +35,7 @@ def create_blackboard(blackboard_data: CreateBlackBoardRequest,
 
     return bb
 
+
 @router.get("/blackboards/{blackboard_id:int}")
 def get_blackboard(blackboard_id: int, db: SessionDep, user: User=Depends(UserRoutes.get_current_user)) -> BaseBlackboard:
     try:
@@ -43,6 +45,7 @@ def get_blackboard(blackboard_id: int, db: SessionDep, user: User=Depends(UserRo
     except PermissionError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     return blackboard
+
 
 @router.get("/my_blackboards")
 def my_blackboards(db: SessionDep, user: User = Depends(UserRoutes.get_current_user)) -> list[BaseBlackboard]:
@@ -72,6 +75,7 @@ def create_task(db: SessionDep, task_data: CreateTaskRequest, user: User = Depen
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e))
     return task
 
+
 @router.post("/blackboard/{blackboard_id:int}/assign", response_model=BaseBlackboard)
 def assign_user_to_blackboard(db: SessionDep, blackboard_id: int, new_user_username: str, user:User= Depends(UserRoutes.get_current_user)) -> BaseBlackboard:
     try:
@@ -90,6 +94,7 @@ def assign_user_to_blackboard(db: SessionDep, blackboard_id: int, new_user_usern
     
     return res
 
+
 @router.get("/tasks/{task_id}", response_model=BaseTask)
 def get_task(db: SessionDep, task_id: int, user: User = Depends(UserRoutes.get_current_user)) -> BaseTask:
     try:
@@ -99,6 +104,7 @@ def get_task(db: SessionDep, task_id: int, user: User = Depends(UserRoutes.get_c
     except PermissionError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     return task
+
 
 @router.post("/tasks/{task_id:int}/executors", response_model=BaseTask)
 def assign_contestant_to_task(db: SessionDep,task_id: int, new_user_username: str, owner: User = Depends(UserRoutes.get_current_user)
@@ -118,6 +124,7 @@ def assign_contestant_to_task(db: SessionDep,task_id: int, new_user_username: st
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
     return result
 
+
 @router.delete("/tasks/{task_id:int}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_task(db: SessionDep, task_id: int, owner: User = UserRoutes.get_current_user):
     try:
@@ -127,6 +134,7 @@ def delete_task(db: SessionDep, task_id: int, owner: User = UserRoutes.get_curre
     except PermissionError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     TFService.delete_task(db, task)
+
 
 @router.delete("/tasks/{task_id}/executors/{executor_username}", response_model=BaseTask)
 def remove_executor_from_task(db: SessionDep, task_id: int, executor_username: str, owner: User = Depends(UserRoutes.get_current_user)):
@@ -143,3 +151,52 @@ def remove_executor_from_task(db: SessionDep, task_id: int, executor_username: s
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
     
     return task 
+
+
+@router.patch("/tasks/{task_id}", response_model=BaseTask)
+def update_task(db: SessionDep, task_id: int, form_data: UpdateTask, owner: User = Depends(UserRoutes.get_current_user)) -> BaseTask:
+    try:
+        task = get_task_with_access(db, owner, task_id, Role.owner)
+    except LookupError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except PermissionError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
+
+    try:
+        updated_task = TFService.update_task(db, task, form_data)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+    return updated_task
+
+def change_task_status(new_status: TaskStatus, required_role: Role | None=None) -> Callable:
+
+    def _dependency(db: SessionDep, task_id: int, user: User = Depends(UserRoutes.get_current_user)):
+        try:
+            task = get_task_with_access(db, user, task_id, required_role)
+        except LookupError as e:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+        except PermissionError as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
+
+        try:
+            updated_task = TFService.change_task_status(db, task, new_status)
+        except ValueError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+        return updated_task
+    return _dependency
+
+@router.patch("/task/{task_id}/open", response_model=BaseTask)
+def open_task(task: Task = Depends(change_task_status(TaskStatus.opened, Role.owner))) -> BaseTask:
+    return task
+
+@router.patch("/task/{task_id}/review", response_model=BaseTask)
+def put_in_review(task: Task = Depends(change_task_status(TaskStatus.in_review))) -> BaseTask:
+    return task
+
+@router.patch("/task/{task_id}/close", response_model=BaseTask)
+def close_task(task: Task = Depends(change_task_status(TaskStatus.closed, Role.owner))):
+    return task
+
+@router.patch("/task/{task_id}/reject", response_model=BaseTask)
+def reject_task(task: Task = Depends(change_task_status(TaskStatus.opened, Role.owner))):
+    return task

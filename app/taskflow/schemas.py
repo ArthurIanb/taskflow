@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from enum import Enum
 from app.users.schemas import BaseUserData
 
@@ -60,3 +60,8 @@ class CreateTaskRequest(BaseModel):
     task_status: TaskStatus
     executor_usernames: list[str]
     blackboard_id: int
+
+
+class UpdateTask(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=100)
+    description: str | None = Field(default=None, min_length=1, max_length=1024)

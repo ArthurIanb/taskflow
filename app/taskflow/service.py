@@ -1,13 +1,19 @@
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.users.models import User
 from app.users import service as UserServices
 
 from .models import Blackboard, BlackboardContestants, Task, TaskExecutors
-from .schemas import Contestant, Role, TaskStatus
+from .schemas import Contestant, Role, TaskStatus, UpdateTask
 
+allowed_task_transitions: dict[TaskStatus, list[TaskStatus]] = {
+    TaskStatus.draft: [TaskStatus.opened],
+    TaskStatus.opened: [TaskStatus.in_review],
+    TaskStatus.in_review: [TaskStatus.opened, TaskStatus.closed],
+    TaskStatus.closed: [TaskStatus.draft, TaskStatus.opened]
+}
 
 def create_blackboard(db: Session, title: str, owner: User, description: str = "") -> Blackboard:
     blackboard = Blackboard(
@@ -114,5 +120,33 @@ def remove_executor(db: Session, task: Task, username: str) -> Task:
     executor = next((ex for ex in task.executors if ex.executor_id == user.id), None)
     db.delete(executor)
     db.commit()
+    db.refresh(task)
+    return task
+
+
+def update_task(db: Session, task: Task, form_data: UpdateTask) -> Task:
+    if form_data.title is not None:
+        task.title = form_data.title
+    if form_data.description is not None:
+        task.description = form_data.description
+
+    try:
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise ValueError("Invalid task data")
+    db.refresh(task)
+    return task
+
+
+def change_task_status(db: Session, task: Task, new_status: TaskStatus) -> Task:
+    if new_status not in allowed_task_transitions[task.status]:
+        raise ValueError(f"Cant changes status from {task.status} to {new_status}")
+    task.status = new_status
+    try:
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise ValueError(f"Error while changing task status to {new_status}")
     db.refresh(task)
     return task
