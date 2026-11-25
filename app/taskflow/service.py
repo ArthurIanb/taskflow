@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.users.models import User
-from app.users import service as UserServices
+from app.users import service as user_services
 
 from .models import Blackboard, BlackboardContestants, Task, TaskExecutors
 from .schemas import Contestant, Role, TaskStatus, UpdateTask
@@ -64,7 +64,7 @@ def create_task(db: Session, title: str, description: str, task_status: TaskStat
     return task
 
 def assign_to_blackboard(db: Session, blackboard: Blackboard, new_user_username: str) -> Blackboard:
-    user = UserServices.get_user_by_username(db=db, username=new_user_username)
+    user = user_services.get_user_by_username(db=db, username=new_user_username)
     if not user:
         raise ValueError("User not found")
     if user.id in [c.contestant_id for c in blackboard.contestants]:
@@ -86,7 +86,7 @@ def get_task_by_id(db: Session, task_id: int) -> Task | None:
     return task
 
 def assign_to_task(db: Session, task: Task, new_user_username: str) -> Task:
-    user = UserServices.get_user_by_username(db, new_user_username)
+    user = user_services.get_user_by_username(db, new_user_username)
     if not user:
         raise ValueError("User does not exists")
     if not any(user.id == c.contestant_id for c in task.blackboard.contestants):
@@ -114,7 +114,7 @@ def delete_task(db: Session, task: Task):
 
 
 def remove_executor(db: Session, task: Task, username: str) -> Task:
-    user = UserServices.get_user_by_username(db, username)
+    user = user_services.get_user_by_username(db, username)
     if not user:
         raise LookupError("User not found")
     executor = next((ex for ex in task.executors if ex.executor_id == user.id), None)
