@@ -99,3 +99,47 @@ def get_task(db: SessionDep, task_id: int, user: User = Depends(UserRoutes.get_c
     except PermissionError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     return task
+
+@router.post("/tasks/{task_id:int}/executors", response_model=BaseTask)
+def assign_contestant_to_task(db: SessionDep,task_id: int, new_user_username: str, owner: User = Depends(UserRoutes.get_current_user)
+                             ) -> BaseTask:
+
+    try:
+        task = get_task_with_access(db, owner, task_id, required_role=Role.owner)
+    except LookupError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except PermissionError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
+    try:
+        result =  TFService.assign_to_task(db, task, new_user_username)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+    except LookupError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    return result
+
+@router.delete("/tasks/{task_id:int}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_task(db: SessionDep, task_id: int, owner: User = UserRoutes.get_current_user):
+    try:
+        task = get_task_with_access(db, owner, task_id, Role.owner)
+    except LookupError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except PermissionError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
+    TFService.delete_task(db, task)
+
+@router.delete("/tasks/{task_id}/executors/{executor_username}", response_model=BaseTask)
+def remove_executor_from_task(db: SessionDep, task_id: int, executor_username: str, owner: User = Depends(UserRoutes.get_current_user)):
+    try:
+        task = get_task_with_access(db, owner, task_id, Role.owner)
+    except LookupError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    except PermissionError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
+
+    try:
+        task = TFService.remove_executor(db, task, executor_username)
+    except LookupError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
+    
+    return task 

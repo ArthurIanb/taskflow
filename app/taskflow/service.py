@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.users.models import User
 from app.users import service as UserServices
@@ -76,4 +77,42 @@ def assign_to_blackboard(db: Session, blackboard: Blackboard, new_user_username:
 
 def get_task_by_id(db: Session, task_id: int) -> Task | None:
     task = db.get(Task, task_id)
+    return task
+
+def assign_to_task(db: Session, task: Task, new_user_username: str) -> Task:
+    user = UserServices.get_user_by_username(db, new_user_username)
+    if not user:
+        raise ValueError("User does not exists")
+    if not any(user.id == c.contestant_id for c in task.blackboard.contestants):
+            raise ValueError("User not a contestant, add him to blackboard")
+    if any(user.id == c.executor_id for c in task.executors):
+        raise ValueError("User already in executors")
+    
+    te = TaskExecutors(
+        task_id=task.id,
+        executor_id=user.id
+    )
+    try:
+        db.add(te)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise LookupError("That exception is impossible, but something has happened, and i dk what")
+    db.refresh(task)
+    return task
+
+
+def delete_task(db: Session, task: Task) -> Blackboard:
+    db.delete(task)
+    db.commit()
+
+
+def remove_executor(db: Session, task: Task, username: str) -> Task:
+    user = UserServices.get_user_by_username(db, username)
+    if not user:
+        raise LookupError("User not found")
+    executor = next((ex for ex in task.executors if ex.executor_id == user.id), None)
+    db.delete(executor)
+    db.commit()
+    db.refresh(task)
     return task
